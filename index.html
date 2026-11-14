@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>UK Pension Allowance & Tax Calculator</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f7ff',
+                            100: '#e0effe',
+                            500: '#0284c7',
+                            600: '#0369a1',
+                            700: '#075985',
+                            900: '#0c4a6e',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        /* Custom scrollbars */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.05);
+        }
+        ::-webkit-scrollbar-thumb {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 3px;
+        }
+        .tab-active {
+            border-bottom: 2px solid #0284c7;
+            color: #0284c7;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body class="bg-slate-50 text-slate-800 antialiased min-h-screen flex flex-col font-sans selection:bg-brand-500 selection:text-white">
+
+    <!-- Header Navigation -->
+    <header class="bg-white border-b border-slate-200 sticky top-0 z-30 shadow-sm">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex items-center space-x-3">
+                    <div class="p-2 bg-brand-500 text-white rounded-xl shadow-md">
+                        <i data-lucide="calculator" class="w-6 h-6"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl font-bold text-slate-900 leading-tight">UK Pension Allowance Calculator</h1>
+                        <p class="text-xs text-slate-500">Tax Years 2023/24 – 2026/27 • Tapered AA & Carry Forward Engine</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-2">
+                    <!-- Export File Button -->
+                    <button onclick="exportDataToFile()" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 shadow-sm" title="Save state to a file to keep on Google Drive">
+                        <i data-lucide="download" class="w-3.5 h-3.5 text-brand-600"></i>
+                        Export File
+                    </button>
+                    <!-- Import File Button -->
+                    <button onclick="triggerFileInput()" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition flex items-center gap-1.5 shadow-sm" title="Load state from a saved file">
+                        <i data-lucide="upload" class="w-3.5 h-3.5 text-brand-600"></i>
+                        Import File
+                    </button>
+                    <input type="file" id="importFileInput" accept=".json" class="hidden" onchange="importDataFromFile(event)">
+
+                    <button onclick="resetDefaults()" class="text-xs font-medium px-3 py-1.5 rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-900 transition flex items-center gap-1.5">
+                        <i data-lucide="rotate-ccw" class="w-3.5 h-3.5"></i>
+                        Reset
+                    </button>
+                    <button onclick="openModal('explainModal')" class="text-xs font-medium px-3 py-1.5 rounded-lg bg-brand-50 text-brand-700 hover:bg-brand-100 transition flex items-center gap-1.5 border border-brand-200">
+                        <i data-lucide="help-circle" class="w-3.5 h-3.5"></i>
+                        Rules Guide
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content Layout -->
+    <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        <!-- Top Overview Metric Cards (Current Year Focus: 2026/27) -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <!-- Metric 1: Total Effective Allowance -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between pb-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">2026/27 Max Total Limit</span>
+                    <span class="p-1.5 bg-blue-50 text-blue-600 rounded-lg"><i data-lucide="shield-check" class="w-4 h-4"></i></span>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="metric-total-limit">£0</div>
+                <div class="text-xs text-slate-500 mt-1 flex items-center gap-1">
+                    <span>Inc. Taper & Carry Forward</span>
+                </div>
+            </div>
+
+            <!-- Metric 2: Contributions Made -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden">
+                <div class="flex items-center justify-between pb-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">2026/27 Total Inputs</span>
+                    <span class="p-1.5 bg-indigo-50 text-indigo-600 rounded-lg"><i data-lucide="piggy-bank" class="w-4 h-4"></i></span>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="metric-total-inputs">£0</div>
+                <div class="text-xs text-slate-500 mt-1 flex items-center gap-1" id="metric-input-breakdown">
+                    Personal + Employer + DB
+                </div>
+            </div>
+
+            <!-- Metric 3: Remaining / Exceeded -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden" id="card-remaining">
+                <div class="flex items-center justify-between pb-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">2026/27 Headroom</span>
+                    <span class="p-1.5 bg-emerald-50 text-emerald-600 rounded-lg" id="icon-headroom"><i data-lucide="trending-up" class="w-4 h-4"></i></span>
+                </div>
+                <div class="text-2xl font-bold text-emerald-600" id="metric-headroom">£0</div>
+                <div class="text-xs text-slate-500 mt-1" id="metric-headroom-sub">Remaining Annual Allowance</div>
+            </div>
+
+            <!-- Metric 4: Estimated Tax Charge -->
+            <div class="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden" id="card-tax-charge">
+                <div class="flex items-center justify-between pb-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">2026/27 Tax Charge</span>
+                    <span class="p-1.5 bg-amber-50 text-amber-600 rounded-lg" id="icon-tax"><i data-lucide="alert-triangle" class="w-4 h-4"></i></span>
+                </div>
+                <div class="text-2xl font-bold text-slate-900" id="metric-tax-charge">£0</div>
+                <div class="text-xs text-slate-500 mt-1" id="metric-tax-charge-sub">Based on marginal tax rate</div>
+            </div>
+        </div>
+
+        <!-- Input Table & Multi-Year Grid -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+            <div class="p-5 border-b border-slate-200 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                <div>
+                    <h2 class="text-base font-semibold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="sliders" class="w-4 h-4 text-brand-500"></i>
+                        Tax Years Inputs & Multi-Year History
+                    </h2>
+                    <p class="text-xs text-slate-500">Adjust figures for each year. Carry forward absorbs excess starting from 3 years prior.</p>
+                </div>
+                <div class="flex items-center gap-2 text-xs font-medium text-slate-600">
+                    <span class="inline-block w-2.5 h-2.5 rounded-full bg-brand-500"></span> Current Year: <strong>2026/27</strong>
+                </div>
+            </div>
+
+            <div class="overflow-x-auto">
+                <table class="w-full text-left text-xs text-slate-600">
+                    <thead class="bg-slate-100/70 uppercase text-[11px] font-semibold text-slate-500 border-b border-slate-200">
+                        <tr>
+                            <th class="py-3.5 px-4 min-w-[160px]">Tax Year</th>
+                            <th class="py-3.5 px-3 min-w-[150px]">Net Taxable Income (£)</th>
+                            <th class="py-3.5 px-3 min-w-[150px]">Personal Contrib. (£)</th>
+                            <th class="py-3.5 px-3 min-w-[150px]">Employer Contrib. (£)</th>
+                            <th class="py-3.5 px-3 min-w-[140px]">DB Input Amount (£)</th>
+                            <th class="py-3.5 px-3 text-center min-w-[110px]">MPAA Triggered</th>
+                            <th class="py-3.5 px-3 text-right min-w-[140px]">Effective Allowance</th>
+                            <th class="py-3.5 px-3 text-right min-w-[130px]">Unused / Surplus</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-slate-100" id="tax-years-table-body">
+                        <!-- Rendered by JS -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- Details & Analytics Tabs -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+            <!-- Carry Forward Absorption Visualizer (2 Cols) -->
+            <div class="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between">
+                <div>
+                    <div class="flex justify-between items-center mb-4">
+                        <div>
+                            <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                                <i data-lucide="layers" class="w-4 h-4 text-brand-500"></i>
+                                Carry Forward Absorption Breakdown (2026/27)
+                            </h3>
+                            <p class="text-xs text-slate-500">Sequentially uses 2026/27 allowance first, then oldest available years (2023/24 → 2024/25 → 2025/26).</p>
+                        </div>
+                        <button onclick="openModal('absorptionModal')" class="text-xs text-brand-600 hover:text-brand-700 font-medium flex items-center gap-1">
+                            <i data-lucide="eye" class="w-3.5 h-3.5"></i> Detailed Audit Log
+                        </button>
+                    </div>
+
+                    <!-- Visual Stack Bar -->
+                    <div class="space-y-3">
+                        <div class="h-6 w-full bg-slate-100 rounded-lg overflow-hidden flex shadow-inner" id="absorption-bar">
+                            <!-- JS Inject Bar Segments -->
+                        </div>
+                        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-2 text-xs" id="absorption-legend">
+                            <!-- JS Inject Legend -->
+                        </div>
+                    </div>
+
+                    <!-- Step by Step Cards -->
+                    <div class="mt-6 grid grid-cols-1 sm:grid-cols-4 gap-3" id="carry-forward-cards">
+                        <!-- JS Inject Year Status Cards -->
+                    </div>
+                </div>
+
+                <div class="mt-6 p-3.5 bg-amber-50/60 border border-amber-200 rounded-xl flex items-start gap-3 text-xs text-amber-800">
+                    <i data-lucide="info" class="w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5"></i>
+                    <div>
+                        <strong>Carry Forward Expiration Notice:</strong> Unused allowance from tax year <strong>2023/24 (£<span id="expiring-2023-amt">0</span>)</strong> will expire after 5th April 2027 and cannot be carried into 2027/28.
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tapered Allowance & Tax Breakdown (1 Col) -->
+            <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5 flex flex-col justify-between space-y-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2 mb-3">
+                        <i data-lucide="calculator" class="w-4 h-4 text-brand-500"></i>
+                        2026/27 Tax & Taper Summary
+                    </h3>
+
+                    <div class="space-y-3 text-xs">
+                        <!-- Threshold & Adjusted Income -->
+                        <div class="p-3 bg-slate-50 rounded-xl space-y-2">
+                            <div class="flex justify-between">
+                                <span class="text-slate-500">Threshold Income:</span>
+                                <span class="font-semibold text-slate-800" id="summary-threshold-inc">£0</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-slate-500 flex items-center gap-1">
+                                    Adjusted Income
+                                    <i data-lucide="help-circle" class="w-3 h-3 text-slate-400 cursor-pointer" onclick="alert('Adjusted Income = Net Taxable Income + Employer Pension Contributions')"></i>:
+                                </span>
+                                <span class="font-semibold text-slate-800" id="summary-adjusted-inc">£0</span>
+                            </div>
+                            <div class="border-t border-slate-200 pt-1.5 flex justify-between font-medium">
+                                <span class="text-slate-600">Taper Status:</span>
+                                <span id="summary-taper-badge" class="px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700">No Taper Applied</span>
+                            </div>
+                        </div>
+
+                        <!-- Calculation Breakdown Table -->
+                        <div class="space-y-1.5 pt-1">
+                            <div class="flex justify-between text-slate-600">
+                                <span>Standard Base AA:</span>
+                                <span class="font-medium" id="sum-base-aa">£60,000</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Taper Reduction:</span>
+                                <span class="font-medium text-rose-600" id="sum-taper-reduction">-£0</span>
+                            </div>
+                            <div class="flex justify-between font-semibold text-slate-900 border-t border-slate-100 pt-1.5">
+                                <span>Effective Tapered AA:</span>
+                                <span id="sum-effective-aa">£60,000</span>
+                            </div>
+                            <div class="flex justify-between text-slate-600">
+                                <span>Available Carry Forward:</span>
+                                <span class="font-medium text-indigo-600" id="sum-available-cf">+£0</span>
+                            </div>
+                            <div class="flex justify-between font-bold text-brand-700 border-t border-slate-200 pt-2 text-sm">
+                                <span>Total Max Capacity:</span>
+                                <span id="sum-total-capacity">£60,000</span>
+                            </div>
+                        </div>
+
+                        <!-- Tax Bracket Selector -->
+                        <div class="pt-3 border-t border-slate-100">
+                            <label class="block text-xs font-medium text-slate-700 mb-1">Marginal Tax Rate (for excess charge):</label>
+                            <select id="marginal-tax-rate" onchange="calculateAll()" class="w-full text-xs bg-slate-50 border border-slate-300 rounded-lg p-2 focus:ring-2 focus:ring-brand-500 outline-none">
+                                <option value="0.20">Basic Rate (20%)</option>
+                                <option value="0.40" selected>Higher Rate (40%)</option>
+                                <option value="0.45">Additional Rate (45%)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action / Print buttons -->
+                <div class="pt-2">
+                    <button onclick="window.print()" class="w-full py-2 bg-slate-900 hover:bg-slate-800 text-white font-medium rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i>
+                        Print Tax Calculation Summary
+                    </button>
+                </div>
+            </div>
+
+        </div>
+
+        <!-- Interactive Chart Visualizer -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm p-5">
+            <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-4">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-900 flex items-center gap-2">
+                        <i data-lucide="bar-chart-3" class="w-4 h-4 text-brand-500"></i>
+                        Historical Allowance vs Contributions Comparison
+                    </h3>
+                    <p class="text-xs text-slate-500">Visual breakdown of inputs against effective annual allowances over 4 tax years.</p>
+                </div>
+            </div>
+            <div class="h-64 w-full">
+                <canvas id="pensionChart"></canvas>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Modal: Rules & Thresholds Guide -->
+    <div id="explainModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl border border-slate-200">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="book-open" class="w-5 h-5 text-brand-500"></i>
+                    UK Pension Allowance Rules Reference Guide
+                </h3>
+                <button onclick="closeModal('explainModal')" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div class="space-y-4 text-xs text-slate-600 leading-relaxed">
+                <div>
+                    <h4 class="font-semibold text-slate-800 text-sm mb-1">1. Standard Annual Allowance (AA)</h4>
+                    <p>For tax years <strong>2023/24 onwards</strong>, the standard Annual Allowance is <strong>£60,000</strong> per tax year. This limit includes personal contributions (grossed up), employer contributions, and Defined Benefit (DB) pension input amounts.</p>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold text-slate-800 text-sm mb-1">2. Tapered Annual Allowance (TAA)</h4>
+                    <p>High earners are subject to a reduced Annual Allowance. Tapering applies if <strong>both</strong> conditions are met:</p>
+                    <ul class="list-disc pl-5 space-y-1 mt-1">
+                        <li><strong>Threshold Income:</strong> Exceeds <strong>£200,000</strong> (taxable income minus personal pension contributions).</li>
+                        <li><strong>Adjusted Income:</strong> Exceeds <strong>£260,000</strong> (taxable income plus employer pension contributions).</li>
+                    </ul>
+                    <p class="mt-1">For every £2 of Adjusted Income above £260,000, your Annual Allowance reduces by £1. The minimum floor allowance is <strong>£10,000</strong> (reached at £360,000+ adjusted income).</p>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold text-slate-800 text-sm mb-1">3. Money Purchase Annual Allowance (MPAA)</h4>
+                    <p>If you flexibly access Defined Contribution (DC) pension benefits, your allowance for future DC contributions is reduced to <strong>£10,000</strong>. Carry forward cannot be used against the MPAA limit once triggered.</p>
+                </div>
+
+                <div>
+                    <h4 class="font-semibold text-slate-800 text-sm mb-1">4. Carry Forward Rules & Order of Set-Off</h4>
+                    <p>You can carry forward unused allowance from up to <strong>3 previous tax years</strong> provided you were a member of a registered pension scheme in those years.</p>
+                    <p class="mt-1"><strong>HMRC Ordering Rule:</strong> Current tax year allowance must be fully used FIRST. Any excess contribution is then absorbed by the oldest available carry-forward year first (e.g., 2023/24 before 2024/25).</p>
+                </div>
+            </div>
+
+            <div class="mt-6 border-t border-slate-200 pt-4 flex justify-end">
+                <button onclick="closeModal('explainModal')" class="px-4 py-2 bg-brand-600 hover:bg-brand-700 text-white rounded-xl text-xs font-medium">
+                    Got it, close
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal: Detailed Carry Forward Audit Log -->
+    <div id="absorptionModal" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 hidden flex items-center justify-center p-4">
+        <div class="bg-white rounded-2xl max-w-xl w-full max-h-[90vh] overflow-y-auto p-6 shadow-xl border border-slate-200">
+            <div class="flex justify-between items-center border-b border-slate-200 pb-3 mb-4">
+                <h3 class="text-base font-bold text-slate-900 flex items-center gap-2">
+                    <i data-lucide="list-tree" class="w-5 h-5 text-brand-500"></i>
+                    Carry Forward Step-by-Step Absorption Audit
+                </h3>
+                <button onclick="closeModal('absorptionModal')" class="text-slate-400 hover:text-slate-600">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+            
+            <div id="audit-log-content" class="space-y-3 text-xs font-mono">
+                <!-- Injected via JS -->
+            </div>
+
+            <div class="mt-6 border-t border-slate-200 pt-4 flex justify-end">
+                <button onclick="closeModal('absorptionModal')" class="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-xl text-xs font-medium">
+                    Close Audit Log
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- App Logic Script -->
+    <script>
+        // Default tax years data structure (2023/24 to 2026/27)
+        const DEFAULT_DATA = [
+            { id: '2023_24', yearLabel: '2023/24', netIncome: 140000, personalContrib: 15000, employerContrib: 15000, dbInput: 0, mpaa: false },
+            { id: '2024_25', yearLabel: '2024/25', netIncome: 180000, personalContrib: 20000, employerContrib: 20000, dbInput: 0, mpaa: false },
+            { id: '2025_26', yearLabel: '2025/26', netIncome: 270000, personalContrib: 25000, employerContrib: 25000, dbInput: 0, mpaa: false },
+            { id: '2026_27', yearLabel: '2026/27 (Current)', netIncome: 310000, personalContrib: 35000, employerContrib: 35000, dbInput: 0, mpaa: false }
+        ];
+
+        let taxData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+        let pensionChart = null;
+
+        // Constants
+        const STANDARD_AA = 60000;
+        const TAPER_THRESHOLD_INC = 200000;
+        const TAPER_ADJUSTED_INC = 260000;
+        const TAPER_MIN_ALLOWANCE = 10000;
+        const MPAA_ALLOWANCE = 10000;
+
+        // Format Currency Helper
+        function formatGBP(amount) {
+            return new Intl.NumberFormat('en-GB', { style: 'currency', currency: 'GBP', maximumFractionDigits: 0 }).format(amount);
+        }
+
+        // --- File Import / Export Handlers ---
+        function exportDataToFile() {
+            const marginalRate = document.getElementById('marginal-tax-rate').value;
+            const stateToSave = {
+                version: "1.0",
+                exportedAt: new Date().toISOString(),
+                marginalTaxRate: marginalRate,
+                taxData: taxData
+            };
+
+            const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(stateToSave, null, 2));
+            const downloadAnchor = document.createElement('a');
+            downloadAnchor.setAttribute("href", dataStr);
+            downloadAnchor.setAttribute("download", `pension_allowance_data_${new Date().toISOString().split('T')[0]}.json`);
+            document.body.appendChild(downloadAnchor);
+            downloadAnchor.click();
+            downloadAnchor.remove();
+        }
+
+        function triggerFileInput() {
+            document.getElementById('importFileInput').click();
+        }
+
+        function importDataFromFile(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const parsedData = JSON.parse(e.target.result);
+                    if (parsedData && Array.isArray(parsedData.taxData)) {
+                        taxData = parsedData.taxData;
+                        if (parsedData.marginalTaxRate) {
+                            document.getElementById('marginal-tax-rate').value = parsedData.marginalTaxRate;
+                        }
+                        renderTable();
+                        calculateAll();
+                        alert("Pension data successfully imported!");
+                    } else {
+                        alert("Invalid file format. Please upload a valid JSON exported from this app.");
+                    }
+                } catch (err) {
+                    alert("Error reading file: " + err.message);
+                }
+            };
+            reader.readAsText(file);
+            // Reset input so same file can be reloaded if needed
+            event.target.value = '';
+        }
+
+        // Render input table rows
+        function renderTable() {
+            const tbody = document.getElementById('tax-years-table-body');
+            tbody.innerHTML = '';
+
+            taxData.forEach((item, index) => {
+                const isCurrent = index === taxData.length - 1;
+                const rowClass = isCurrent ? 'bg-brand-50/30 font-medium' : 'hover:bg-slate-50';
+
+                const tr = document.createElement('tr');
+                tr.className = `${rowClass} transition-colors`;
+                tr.innerHTML = `
+                    <td class="py-3 px-4 font-semibold text-slate-800 flex items-center gap-2">
+                        ${item.yearLabel}
+                        ${isCurrent ? '<span class="px-1.5 py-0.5 rounded text-[10px] bg-brand-100 text-brand-700 font-bold">CURRENT</span>' : ''}
+                    </td>
+                    <td class="py-2 px-3">
+                        <div class="relative">
+                            <span class="absolute left-2.5 top-2 text-slate-400">£</span>
+                            <input type="number" min="0" value="${item.netIncome}" onchange="updateValue(${index}, 'netIncome', this.value)"
+                                class="w-full pl-6 pr-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </td>
+                    <td class="py-2 px-3">
+                        <div class="relative">
+                            <span class="absolute left-2.5 top-2 text-slate-400">£</span>
+                            <input type="number" min="0" value="${item.personalContrib}" onchange="updateValue(${index}, 'personalContrib', this.value)"
+                                class="w-full pl-6 pr-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </td>
+                    <td class="py-2 px-3">
+                        <div class="relative">
+                            <span class="absolute left-2.5 top-2 text-slate-400">£</span>
+                            <input type="number" min="0" value="${item.employerContrib}" onchange="updateValue(${index}, 'employerContrib', this.value)"
+                                class="w-full pl-6 pr-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </td>
+                    <td class="py-2 px-3">
+                        <div class="relative">
+                            <span class="absolute left-2.5 top-2 text-slate-400">£</span>
+                            <input type="number" min="0" value="${item.dbInput}" onchange="updateValue(${index}, 'dbInput', this.value)"
+                                class="w-full pl-6 pr-2 py-1.5 bg-white border border-slate-300 rounded-lg text-xs text-slate-800 focus:ring-2 focus:ring-brand-500 outline-none">
+                        </div>
+                    </td>
+                    <td class="py-2 px-3 text-center">
+                        <input type="checkbox" ${item.mpaa ? 'checked' : ''} onchange="updateValue(${index}, 'mpaa', this.checked)"
+                            class="w-4 h-4 text-brand-600 rounded border-slate-300 focus:ring-brand-500 cursor-pointer">
+                    </td>
+                    <td class="py-3 px-3 text-right font-medium text-slate-700" id="effective-aa-${index}">
+                        £0
+                    </td>
+                    <td class="py-3 px-3 text-right font-semibold" id="unused-aa-${index}">
+                        £0
+                    </td>
+                `;
+                tbody.appendChild(tr);
+            });
+        }
+
+        function updateValue(index, field, value) {
+            if (field === 'mpaa') {
+                taxData[index][field] = Boolean(value);
+            } else {
+                taxData[index][field] = Math.max(0, parseFloat(value) || 0);
+            }
+            calculateAll();
+        }
+
+        function resetDefaults() {
+            taxData = JSON.parse(JSON.stringify(DEFAULT_DATA));
+            renderTable();
+            calculateAll();
+        }
+
+        // Tapered Annual Allowance calculation logic
+        function calculateTaperedAllowance(netIncome, personalContrib, employerContrib, isMpaa) {
+            if (isMpaa) {
+                return { effectiveAA: MPAA_ALLOWANCE, isTapered: false, thresholdIncome: 0, adjustedIncome: 0, reduction: 0 };
+            }
+
+            // Threshold Income = Net Taxable Income - Personal Pension Contributions
+            const thresholdIncome = Math.max(0, netIncome - personalContrib);
+
+            // Adjusted Income = Net Taxable Income + Employer Pension Contributions
+            const adjustedIncome = netIncome + employerContrib;
+
+            let effectiveAA = STANDARD_AA;
+            let reduction = 0;
+            let isTapered = false;
+
+            if (thresholdIncome > TAPER_THRESHOLD_INC && adjustedIncome > TAPER_ADJUSTED_INC) {
+                isTapered = true;
+                const excessAdjusted = adjustedIncome - TAPER_ADJUSTED_INC;
+                reduction = Math.floor(excessAdjusted / 2);
+                effectiveAA = Math.max(TAPER_MIN_ALLOWANCE, STANDARD_AA - reduction);
+            }
+
+            return { effectiveAA, isTapered, thresholdIncome, adjustedIncome, reduction };
+        }
+
+        // Calculation core engine
+        function calculateAll() {
+            let processedYears = [];
+
+            // Step 1: Calculate standalone years effective AA & unused amounts
+            taxData.forEach((item, index) => {
+                const totalContrib = item.personalContrib + item.employerContrib + item.dbInput;
+                const taperInfo = calculateTaperedAllowance(item.netIncome, item.personalContrib, item.employerContrib, item.mpaa);
+                
+                const unused = taperInfo.effectiveAA - totalContrib;
+
+                processedYears.push({
+                    ...item,
+                    totalContrib,
+                    effectiveAA: taperInfo.effectiveAA,
+                    isTapered: taperInfo.isTapered,
+                    thresholdIncome: taperInfo.thresholdIncome,
+                    adjustedIncome: taperInfo.adjustedIncome,
+                    taperReduction: taperInfo.reduction,
+                    standaloneUnused: Math.max(0, unused),
+                    standaloneExcess: Math.max(0, totalContrib - taperInfo.effectiveAA)
+                });
+
+                // Update Table Row Cells
+                const effElem = document.getElementById(`effective-aa-${index}`);
+                const unusedElem = document.getElementById(`unused-aa-${index}`);
+
+                if (effElem) {
+                    effElem.innerHTML = `${formatGBP(taperInfo.effectiveAA)} ${taperInfo.isTapered ? '<span class="text-[10px] text-amber-600 bg-amber-50 px-1 py-0.5 rounded">Tapered</span>' : ''}`;
+                }
+
+                if (unusedElem) {
+                    if (unused >= 0) {
+                        unusedElem.className = 'py-3 px-3 text-right font-semibold text-emerald-600';
+                        unusedElem.textContent = `+${formatGBP(unused)}`;
+                    } else {
+                        unusedElem.className = 'py-3 px-3 text-right font-semibold text-rose-600';
+                        unusedElem.textContent = `-${formatGBP(Math.abs(unused))}`;
+                    }
+                }
+            });
+
+            // Step 2: Perform Carry Forward Calculation for Current Year (index 3: 2026/27)
+            const curIdx = 3;
+            const currentYear = processedYears[curIdx];
+
+            // Available Carry Forward Pool from past 3 years (2023/24, 2024/25, 2025/26)
+            let carryForwardPool = [
+                { year: processedYears[0].yearLabel, index: 0, available: processedYears[0].standaloneUnused, original: processedYears[0].standaloneUnused, absorbed: 0 },
+                { year: processedYears[1].yearLabel, index: 1, available: processedYears[1].standaloneUnused, original: processedYears[1].standaloneUnused, absorbed: 0 },
+                { year: processedYears[2].yearLabel, index: 2, available: processedYears[2].standaloneUnused, original: processedYears[2].standaloneUnused, absorbed: 0 }
+            ];
+
+            const currentTotalInputs = currentYear.totalContrib;
+            const currentEffAA = currentYear.effectiveAA;
+
+            let currentYearAbsorbed = Math.min(currentTotalInputs, currentEffAA);
+            let remainingExcess = Math.max(0, currentTotalInputs - currentEffAA);
+
+            let auditLogs = [];
+            auditLogs.push(`1. Total 2026/27 pension inputs: ${formatGBP(currentTotalInputs)}`);
+            auditLogs.push(`2. 2026/27 Effective Annual Allowance: ${formatGBP(currentEffAA)}`);
+            auditLogs.push(`   -> Covered by 2026/27 Allowance: ${formatGBP(currentYearAbsorbed)}`);
+
+            if (remainingExcess > 0) {
+                auditLogs.push(`3. Excess contribution to absorb via Carry Forward: ${formatGBP(remainingExcess)}`);
+                
+                // HMRC Order of set-off: Oldest available year first (2023/24 -> 2024/25 -> 2025/26)
+                for (let cf of carryForwardPool) {
+                    if (remainingExcess <= 0) break;
+
+                    if (cf.available > 0) {
+                        const amountToAbsorb = Math.min(remainingExcess, cf.available);
+                        cf.absorbed = amountToAbsorb;
+                        cf.available -= amountToAbsorb;
+                        remainingExcess -= amountToAbsorb;
+
+                        auditLogs.push(`   -> Absorbed ${formatGBP(amountToAbsorb)} from ${cf.year} (Remaining in ${cf.year}: ${formatGBP(cf.available)})`);
+                    } else {
+                        auditLogs.push(`   -> ${cf.year} has £0 unused allowance available.`);
+                    }
+                }
+            } else {
+                auditLogs.push(`3. No excess contribution. Current year allowance fully covers inputs.`);
+            }
+
+            const unabsorbedTaxableExcess = remainingExcess;
+            const marginalRate = parseFloat(document.getElementById('marginal-tax-rate').value) || 0.40;
+            const taxCharge = unabsorbedTaxableExcess * marginalRate;
+
+            const totalAvailableCarryForward = carryForwardPool.reduce((sum, item) => sum + item.original, 0);
+            const totalMaxCapacity = currentEffAA + totalAvailableCarryForward;
+            const headroom = Math.max(0, totalMaxCapacity - currentTotalInputs);
+
+            // Update Top Metrics UI
+            document.getElementById('metric-total-limit').textContent = formatGBP(totalMaxCapacity);
+            document.getElementById('metric-total-inputs').textContent = formatGBP(currentTotalInputs);
+            
+            const headroomElem = document.getElementById('metric-headroom');
+            const headroomSubElem = document.getElementById('metric-headroom-sub');
+            const cardRemaining = document.getElementById('card-remaining');
+            
+            if (unabsorbedTaxableExcess > 0) {
+                headroomElem.className = 'text-2xl font-bold text-rose-600';
+                headroomElem.textContent = `-${formatGBP(unabsorbedTaxableExcess)}`;
+                headroomSubElem.textContent = 'Excess Subject to Tax Charge';
+                cardRemaining.className = 'bg-rose-50/40 p-5 rounded-2xl border border-rose-200 shadow-sm relative overflow-hidden';
+            } else {
+                headroomElem.className = 'text-2xl font-bold text-emerald-600';
+                headroomElem.textContent = formatGBP(headroom);
+                headroomSubElem.textContent = 'Remaining Allowance Headroom';
+                cardRemaining.className = 'bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden';
+            }
+
+            const taxChargeElem = document.getElementById('metric-tax-charge');
+            const cardTax = document.getElementById('card-tax-charge');
+            taxChargeElem.textContent = formatGBP(taxCharge);
+
+            if (taxCharge > 0) {
+                taxChargeElem.className = 'text-2xl font-bold text-rose-600';
+                cardTax.className = 'bg-rose-50/50 p-5 rounded-2xl border border-rose-300 shadow-sm relative overflow-hidden';
+            } else {
+                taxChargeElem.className = 'text-2xl font-bold text-slate-900';
+                cardTax.className = 'bg-white p-5 rounded-2xl border border-slate-200 shadow-sm relative overflow-hidden';
+            }
+
+            // Update Tax & Taper Side Panel
+            document.getElementById('summary-threshold-inc').textContent = formatGBP(currentYear.thresholdIncome);
+            document.getElementById('summary-adjusted-inc').textContent = formatGBP(currentYear.adjustedIncome);
+            
+            const taperBadge = document.getElementById('summary-taper-badge');
+            if (currentYear.isTapered) {
+                taperBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-100 text-amber-800';
+                taperBadge.textContent = 'Taper Applied';
+            } else {
+                taperBadge.className = 'px-2 py-0.5 rounded text-[10px] font-semibold bg-emerald-100 text-emerald-700';
+                taperBadge.textContent = 'No Taper';
+            }
+
+            document.getElementById('sum-base-aa').textContent = formatGBP(STANDARD_AA);
+            document.getElementById('sum-taper-reduction').textContent = `-${formatGBP(currentYear.taperReduction)}`;
+            document.getElementById('sum-effective-aa').textContent = formatGBP(currentEffAA);
+            document.getElementById('sum-available-cf').textContent = `+${formatGBP(totalAvailableCarryForward)}`;
+            document.getElementById('sum-total-capacity').textContent = formatGBP(totalMaxCapacity);
+
+            // Expiring 2023/24 Notice
+            const expiringAmt = carryForwardPool[0].available; // Remaining 2023/24 unused
+            document.getElementById('expiring-2023-amt').textContent = expiringAmt.toLocaleString('en-GB');
+
+            // Update Carry Forward Visual Stack Bar
+            updateAbsorptionBar(currentTotalInputs, currentEffAA, carryForwardPool);
+
+            // Update Carry Forward Step Cards
+            updateCarryForwardCards(carryForwardPool);
+
+            // Update Audit Log Modal Text
+            document.getElementById('audit-log-content').innerHTML = auditLogs.map(l => `<div class="p-1.5 bg-slate-50 rounded border border-slate-100">${l}</div>`).join('');
+
+            // Update Chart
+            updateChart(processedYears);
+        }
+
+        // Render Stacked Absorption Bar
+        function updateAbsorptionBar(inputs, currentEffAA, cfPool) {
+            const barContainer = document.getElementById('absorption-bar');
+            const legendContainer = document.getElementById('absorption-legend');
+
+            barContainer.innerHTML = '';
+            legendContainer.innerHTML = '';
+
+            const totalCapacity = currentEffAA + cfPool.reduce((s, c) => s + c.original, 0);
+            if (totalCapacity === 0) return;
+
+            const usedCurrent = Math.min(inputs, currentEffAA);
+            let remainingInput = Math.max(0, inputs - currentEffAA);
+
+            // 1. Current Year Segment
+            const curPct = (usedCurrent / totalCapacity) * 100;
+            if (curPct > 0) {
+                const seg = document.createElement('div');
+                seg.className = 'bg-brand-500 h-full text-[10px] font-bold text-white flex items-center justify-center transition-all';
+                seg.style.width = `${curPct}%`;
+                seg.title = `2026/27 Allowance Used: ${formatGBP(usedCurrent)}`;
+                barContainer.appendChild(seg);
+            }
+
+            // CF Segments colors
+            const colors = [
+                { bg: 'bg-indigo-500', text: 'text-indigo-600', name: '2023/24 CF' },
+                { bg: 'bg-purple-500', text: 'text-purple-600', name: '2024/25 CF' },
+                { bg: 'bg-pink-500', text: 'text-pink-600', name: '2025/26 CF' }
+            ];
+
+            cfPool.forEach((cf, idx) => {
+                const used = cf.absorbed;
+                const pct = (used / totalCapacity) * 100;
+
+                if (pct > 0) {
+                    const seg = document.createElement('div');
+                    seg.className = `${colors[idx].bg} h-full text-[10px] font-bold text-white flex items-center justify-center transition-all`;
+                    seg.style.width = `${pct}%`;
+                    seg.title = `${cf.year} Carry Forward Used: ${formatGBP(used)}`;
+                    barContainer.appendChild(seg);
+                }
+            });
+
+            // Legends
+            const legends = [
+                { color: 'bg-brand-500', label: '2026/27 AA', val: usedCurrent },
+                { color: 'bg-indigo-500', label: '2023/24 CF Used', val: cfPool[0].absorbed },
+                { color: 'bg-purple-500', label: '2024/25 CF Used', val: cfPool[1].absorbed },
+                { color: 'bg-pink-500', label: '2025/26 CF Used', val: cfPool[2].absorbed }
+            ];
+
+            legends.forEach(l => {
+                const item = document.createElement('div');
+                item.className = 'flex items-center gap-1.5';
+                item.innerHTML = `
+                    <span class="w-2.5 h-2.5 rounded-full ${l.color}"></span>
+                    <span class="text-slate-600">${l.label}: <strong>${formatGBP(l.val)}</strong></span>
+                `;
+                legendContainer.appendChild(item);
+            });
+        }
+
+        // Render Cards for Carry Forward Years
+        function updateCarryForwardCards(cfPool) {
+            const container = document.getElementById('carry-forward-cards');
+            container.innerHTML = '';
+
+            cfPool.forEach((cf) => {
+                const card = document.createElement('div');
+                card.className = 'p-3 bg-slate-50 border border-slate-200 rounded-xl space-y-1';
+
+                const statusBadge = cf.absorbed > 0 
+                    ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-indigo-100 text-indigo-700">Absorbing</span>`
+                    : (cf.original > 0 ? `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-emerald-100 text-emerald-700">Available</span>` : `<span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-slate-200 text-slate-600">Zero</span>`);
+
+                card.innerHTML = `
+                    <div class="flex justify-between items-center">
+                        <span class="font-bold text-slate-800 text-xs">${cf.year}</span>
+                        ${statusBadge}
+                    </div>
+                    <div class="text-[11px] text-slate-500 flex justify-between">
+                        <span>Original Unused:</span>
+                        <span class="font-medium text-slate-700">${formatGBP(cf.original)}</span>
+                    </div>
+                    <div class="text-[11px] text-slate-500 flex justify-between">
+                        <span>Absorbed Now:</span>
+                        <span class="font-medium text-indigo-600">-${formatGBP(cf.absorbed)}</span>
+                    </div>
+                    <div class="border-t border-slate-200 pt-1 text-[11px] text-slate-700 flex justify-between font-semibold">
+                        <span>Carried to 27/28:</span>
+                        <span>${formatGBP(cf.available)}</span>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+
+            // 2026/27 Unused Remaining Card
+            const curYearUnused = Math.max(0, taxData[3].effectiveAA - (taxData[3].personalContrib + taxData[3].employerContrib + taxData[3].dbInput));
+            const curCard = document.createElement('div');
+            curCard.className = 'p-3 bg-brand-50/50 border border-brand-200 rounded-xl space-y-1';
+            curCard.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="font-bold text-brand-900 text-xs">2026/27</span>
+                    <span class="px-1.5 py-0.5 rounded text-[9px] font-bold bg-brand-100 text-brand-700">Current</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex justify-between">
+                    <span>Effective AA:</span>
+                    <span class="font-medium text-slate-700">${formatGBP(taxData[3].effectiveAA || 60000)}</span>
+                </div>
+                <div class="text-[11px] text-slate-500 flex justify-between">
+                    <span>Inputs Made:</span>
+                    <span class="font-medium text-brand-700">${formatGBP(taxData[3].personalContrib + taxData[3].employerContrib + taxData[3].dbInput)}</span>
+                </div>
+                <div class="border-t border-brand-200 pt-1 text-[11px] text-brand-900 flex justify-between font-semibold">
+                    <span>New CF Created:</span>
+                    <span>${formatGBP(curYearUnused)}</span>
+                </div>
+            `;
+            container.appendChild(curCard);
+        }
+
+        // Render Historical Comparison Chart
+        function updateChart(years) {
+            const ctx = document.getElementById('pensionChart').getContext('2d');
+            
+            const labels = years.map(y => y.yearLabel);
+            const inputsData = years.map(y => y.totalContrib);
+            const allowanceData = years.map(y => y.effectiveAA);
+
+            if (pensionChart) {
+                pensionChart.destroy();
+            }
+
+            pensionChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [
+                        {
+                            label: 'Total Pension Inputs (£)',
+                            data: inputsData,
+                            backgroundColor: '#0284c7',
+                            borderRadius: 6,
+                            barPercentage: 0.5
+                        },
+                        {
+                            label: 'Effective Annual Allowance (£)',
+                            data: allowanceData,
+                            backgroundColor: '#cbd5e1',
+                            borderRadius: 6,
+                            barPercentage: 0.5
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'top',
+                            labels: {
+                                font: { family: 'Inter', size: 12 },
+                                usePointStyle: true
+                            }
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return `${context.dataset.label}: £${context.parsed.y.toLocaleString('en-GB')}`;
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            ticks: {
+                                callback: function(value) { return '£' + value.toLocaleString('en-GB'); },
+                                font: { family: 'Inter', size: 11 }
+                            },
+                            grid: { color: '#f1f5f9' }
+                        },
+                        x: {
+                            ticks: { font: { family: 'Inter', size: 11 } },
+                            grid: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // Modal Helpers
+        function openModal(id) {
+            document.getElementById(id).classList.remove('hidden');
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        // Initialize App on load
+        window.onload = function() {
+            lucide.createIcons();
+            renderTable();
+            calculateAll();
+        };
+    </script>
+</body>
+</html>
